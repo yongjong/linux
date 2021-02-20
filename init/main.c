@@ -864,11 +864,11 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	 * Interrupts are still disabled. Do necessary setups, then
 	 * enable them.
 	 */
-	boot_cpu_init();
+	boot_cpu_init(); // 激活当前CPU
 	page_address_init();
 	pr_notice("%s", linux_banner);
 	early_security_init();
-	setup_arch(&command_line);
+	setup_arch(&command_line); // 对不同体系结构的CPU设置不同的参数、选项。
 	setup_boot_config(command_line);
 	setup_command_line(command_line);
 	setup_nr_cpu_ids();
@@ -950,7 +950,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	/* init some links before init_ISA_irqs() */
 	early_irq_init();
 	init_IRQ();
-	tick_init();
+	tick_init(); // 初始化内核时钟系统
 	rcu_init_nohz();
 	init_timers();
 	hrtimers_init();
@@ -968,7 +968,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	rand_initialize();
 	add_latent_entropy();
 	add_device_randomness(command_line, strlen(command_line));
-	boot_init_stack_canary();
+	boot_init_stack_canary(); // 为栈增加保护机制，预防缓冲区溢出攻击
 
 	time_init();
 	perf_event_init();
