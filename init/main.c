@@ -111,6 +111,10 @@
 
 static int kernel_init(void *);
 
+/*
+ * 初始化中断相关的工作，
+ * 主要初始化中断描述数组，然后调用每个CPU架构中断初始化
+ */
 extern void init_IRQ(void);
 extern void radix_tree_init(void);
 
@@ -855,16 +859,16 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	smp_setup_processor_id();
 	debug_objects_early_init();
 
-	cgroup_init_early();
+	cgroup_init_early(); // 控制组早期初始化
 
-	local_irq_disable();
-	early_boot_irqs_disabled = true;
+	local_irq_disable(); // 关闭当前CPU的所有中断响应。
+	early_boot_irqs_disabled = true; //
 
 	/*
 	 * Interrupts are still disabled. Do necessary setups, then
 	 * enable them.
 	 */
-	boot_cpu_init(); // 激活当前CPU
+	boot_cpu_init(); // 设置当前引导系统在物理上存在，在逻辑上可以使用，初始化准备好。
 	page_address_init();
 	pr_notice("%s", linux_banner);
 	early_security_init();
@@ -876,13 +880,14 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	smp_prepare_boot_cpu();	/* arch-specific boot-cpu hooks */
 	boot_cpu_hotplug_init();
 
-	build_all_zonelists(NULL);
-	page_alloc_init();
+	build_all_zonelists(NULL); // 初始化所有内存管理节点列表，以便后面进行内存管理初始化
+	page_alloc_init(); // 设置内存页分配通知器
 
 	pr_notice("Kernel command line: %s\n", saved_command_line);
 	/* parameters may set static keys */
 	jump_label_init();
-	parse_early_param();
+	parse_early_param(); // 分析命令行最早使用的参数
+	/* 对传入内核参数进行解释，不能识别的命令调用最后参数的函数 */
 	after_dashes = parse_args("Booting kernel",
 				  static_command_line, __start___param,
 				  __stop___param - __start___param,
@@ -899,10 +904,10 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	 * kmem_cache_init()
 	 */
 	setup_log_buf(0);
-	vfs_caches_init_early();
-	sort_main_extable();
-	trap_init();
-	mm_init();
+	vfs_caches_init_early(); // 对虚拟文件系统缓存进行初始化
+	sort_main_extable(); // 对内核内部的异常表进行对排序，以便加速访问
+	trap_init(); // 这个函数对异常进行初始化，
+	mm_init(); //标记哪些内存可以使用，并且告诉系统有多少内存可以使用
 
 	ftrace_init();
 
@@ -914,16 +919,21 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	 * timer interrupt). Full topology setup happens at smp_init()
 	 * time - but meanwhile we still have a functioning scheduler.
 	 */
-	sched_init();
+	/* 
+	 * 对进程调度器进行初始化，比如分配调度器占用的内存，初始化任务队列，
+	 * 设置当前任务的空线程，当前任务的调度策略为CFS调度器。
+	 */
+	sched_init(); 
 	/*
 	 * Disable preemption - early bootup scheduling is extremely
 	 * fragile until we cpu_idle() for the first time.
 	 */
-	preempt_disable();
+	preempt_disable(); // 关闭优先级调度。由于每个进程任务都有优先级，系统尚未完全初始化化，不能打开优先级调度。
+	// 判断是否过早打开中断，如果是，提示并关中断。
 	if (WARN(!irqs_disabled(),
 		 "Interrupts were enabled *very* early, fixing it\n"))
 		local_irq_disable();
-	radix_tree_init();
+	radix_tree_init(); // 初始化radix树，radix树是基于二进制键值的查找树。
 
 	/*
 	 * Set up housekeeping before setting up workqueues to allow the unbound
@@ -938,7 +948,7 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	 */
 	workqueue_init_early();
 
-	rcu_init();
+	rcu_init(); // 初始化直接读拷贝更新的锁机制。rcu主要提供在读取数据机会较多，更新较少的场景，减少读取数据所的性能低下问题。
 
 	/* Trace events are available after this */
 	trace_init();
@@ -952,10 +962,15 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	init_IRQ();
 	tick_init(); // 初始化内核时钟系统
 	rcu_init_nohz();
+	/*
+	 * 初始化引导CPU的时钟相关的数据结构
+	 * 注册时钟的回调函数，当时钟到达时可以回调时钟处理函数
+	 * 最后初始化时钟软件中断处理
+	 */
 	init_timers();
-	hrtimers_init();
-	softirq_init();
-	timekeeping_init();
+	hrtimers_init(); // 初始化高精度定时器，设置回调函数
+	softirq_init(); // 初始化软中断，软终端与硬中断区别在于中断发生时，软中断使用线程监控中断信号，硬中断使用CPU硬件监控中断。
+	timekeeping_init(); // 初始化系统时钟计时，并且初始化内核里与时钟计时相关的变量。
 
 	/*
 	 * For best initial stack canary entropy, prepare it after:
@@ -972,11 +987,17 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 
 	time_init();
 	perf_event_init();
-	profile_init();
+	profile_init(); // 分配内核性能保存的内存，以便统计的性能变量可以保存到这里
 	call_function_init();
+	// 提示中断是否过早地打开
 	WARN(!irqs_disabled(), "Interrupts were enabled early\n");
 
 	early_boot_irqs_disabled = false;
+	/* 
+	 * 打开本CPU的中断，即允许本CPU处理中断事件
+	 * 在这里打开CPU的中断处理
+	 * 如果是多核处理器，别的CPU还没有打开中断处理
+	 */
 	local_irq_enable();
 
 	kmem_cache_init_late();
@@ -986,17 +1007,33 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	 * we've done PCI setups etc, and console_init() must be aware of
 	 * this. But we do want output early, in case something goes wrong.
 	 */
+	/*
+	 * 初始化控制台，从这个函数后就可以输出内容到控制台了
+	 * 在这个函数初始化之前，都没有办法输出内容，就是输出也是写到输出缓冲区缓存起来，
+	 * 等到这个函数调用后，立即输出内容
+	 */
 	console_init();
+	/* 
+	 * 判断分析输入的参数是否出错，如果有出错，启动控制台输出之后，立即打印出错参数
+	 * 以便用户立即看到出错的地方
+	 */
 	if (panic_later)
 		panic("Too many boot %s vars at `%s'", panic_later,
 		      panic_param);
-
+	/*
+	 * 打印缩的依赖信息，用来调试锁，通过这个函数可以查看目前锁的状态，
+	 * 以便可以发现哪些锁产生死锁，哪些锁使用有问题。
+	 */
 	lockdep_init();
 
 	/*
 	 * Need to run this when irqs are enabled, because it wants
 	 * to self-test [hard/soft]-irqs on/off lock inversion bugs
 	 * too:
+	 */
+	/*
+	 * 用来测试所的API是否使用正常，进行自我测试
+	 * 比如测试自旋锁、读写锁，一般信号量和读写信号量。
 	 */
 	locking_selftest();
 
@@ -1018,8 +1055,14 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	}
 #endif
 	setup_per_cpu_pageset();
+	/*
+	 * 初始化NUMA内存访问策略
+	 */
 	numa_policy_init();
 	acpi_early_init();
+	/*
+	 * 运行时钟相关后期的初始化功能
+	 */
 	if (late_time_init)
 		late_time_init();
 	sched_clock_init();
