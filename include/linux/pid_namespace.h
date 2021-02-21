@@ -20,9 +20,16 @@ struct pid_namespace {
 	struct idr idr;
 	struct rcu_head rcu;
 	unsigned int pid_allocated;
+	/* 
+	 * 每个PID命名进程空间都具有一个进程，其发挥的作用相当于全局的init进程。
+	 * init的一个目的时对孤儿进程调用wait4，命名空间局部的init变体必须完成该工作。
+	 * child_reaper保存了指向该进程的task_struct的指针。
+	 */
 	struct task_struct *child_reaper;
 	struct kmem_cache *pid_cachep;
+	/* 当前命名空间在命名空间层次结构中的深度，初始命名空间的level为0 */
 	unsigned int level;
+	/* 指向父命名空间的指针。*/
 	struct pid_namespace *parent;
 #ifdef CONFIG_BSD_PROCESS_ACCT
 	struct fs_pin *bacct;
