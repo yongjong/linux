@@ -850,6 +850,14 @@ void __init __weak arch_call_rest_init(void)
 	rest_init();
 }
 
+/* 
+ * 宏定义asmlinkage（定义在inlcude/linux/linkage.h）的作用：
+ * 1、传给函数的参数全部用栈式传送，不用寄存器传送
+ * X86寄存器数量少，用于传参数的寄存器最多只有只有六个。
+ * 2、声明该函数给汇编代码调用。
+ * 宏定义__init的作用（定义在include/linux/init.h）：标志这个函数编译出来的目标代码放在哪一段代码里
+ * 让关联代码放在同一个段里。
+ */
 asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 {
 	char *command_line;
