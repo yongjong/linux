@@ -79,12 +79,27 @@ struct io_uring_task;
  */
 
 /* Used in tsk->state: */
+/* 进程处于就绪状态，等待调度器调度 */
 #define TASK_RUNNING			0x0000
+/* 
+ * 针对等待某事件或其它资源的睡眠进程设置，
+ * 在内核发送信号给该进程表明事件已经发生时，进程状态变为TASK_RUNNING
+ * 只要调度器选中该进程即可执行
+ */
 #define TASK_INTERRUPTIBLE		0x0001
+/*
+ * 用于内核指示而停用的睡眠进程，无法通过外部信号唤醒，只能由内核亲自唤醒
+ * 如何唤醒？
+ */
 #define TASK_UNINTERRUPTIBLE		0x0002
+/* 进程特意停止运行，例如由调试器暂停 */
 #define __TASK_STOPPED			0x0004
+/* 非进程状态，用于停止的进程，将当前被调试的那些进程与常规进程区分开来 */
 #define __TASK_TRACED			0x0008
 /* Used in tsk->exit_state: */
+/* wait系统调用已经发出，进程完全从系统移除之前的状态*/
+#define EXIT_DEAD			0x0010
+/* 僵尸状态 */
 #define EXIT_DEAD			0x0010
 #define EXIT_ZOMBIE			0x0020
 #define EXIT_TRACE			(EXIT_ZOMBIE | EXIT_DEAD)
@@ -860,17 +875,17 @@ struct task_struct {
 	 */
 
 	/* Real parent process: */
-	struct task_struct __rcu	*real_parent;
+	struct task_struct __rcu	*real_parent; // 真正的父进程，（在被调试的情况下）
 
 	/* Recipient of SIGCHLD, wait4() reports: */
-	struct task_struct __rcu	*parent;
+	struct task_struct __rcu	*parent; // 父进程
 
 	/*
 	 * Children/sibling form the list of natural children:
 	 */
-	struct list_head		children;
-	struct list_head		sibling;
-	struct task_struct		*group_leader;
+	struct list_head		children; // 子进程链表
+	struct list_head		sibling; // 兄弟进程链表
+	struct task_struct		*group_leader; //线程组组长
 
 	/*
 	 * 'ptraced' is the list of tasks this task is using ptrace() on.
@@ -883,7 +898,7 @@ struct task_struct {
 
 	/* PID/PID hash table linkage. */
 	struct pid			*thread_pid;
-	struct hlist_node		pid_links[PIDTYPE_MAX];
+	struct hlist_node		pid_links[PIDTYPE_MAX]; // pid 与pid散列表的联系
 	struct list_head		thread_group;
 	struct list_head		thread_node;
 
@@ -911,16 +926,17 @@ struct task_struct {
 	atomic_t			tick_dep_mask;
 #endif
 	/* Context switch counts: */
-	unsigned long			nvcsw;
+	unsigned long			nvcsw; // 上下文切换计数
 	unsigned long			nivcsw;
 
 	/* Monotonic time in nsecs: */
 	u64				start_time;
 
 	/* Boot based time in nsecs: */
-	u64				start_boottime;
+	u64				start_boottime; // 启动以来的时间
 
 	/* MM fault and swap info: this can arguably be seen as either mm-specific or thread-specific: */
+	/* 内存管理器失效和页交换信息*/
 	unsigned long			min_flt;
 	unsigned long			maj_flt;
 
